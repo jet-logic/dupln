@@ -26,10 +26,29 @@ def filesizef(s):
 
 def filesizep(s: str):
     if s[0].isnumeric():
-        for i, v in enumerate("bkmgtpezy"):
-            if s[-1].lower().endswith(v):
-                return int(s[0:-1]) * (2 ** (10 * i))
+        q = s.lower().rstrip("b")
+        for i, v in enumerate("kmgtpezy"):
+            if q[-1].endswith(v):
+                return float(q[0:-1]) * (2 ** (10 * (i + 1)))
+        return float(q)
     return float(s)
+
+
+def sizerangep(s=""):
+    f, d, t = s.partition("..")
+    if d:
+        a, b = [filesizep(f) if f else 0, filesizep(t) if t else float("inf")]
+        return (a, b)
+    elif f:
+        c = filesizep(f)
+        return (c, c)
+    else:
+        return (0, float("inf"))
+
+
+def size_range_check(s=""):
+    a, b = sizerangep(s)
+    return lambda n: n >= a and n <= b
 
 
 class Counter(object):
@@ -64,20 +83,17 @@ class Counter(object):
 
 
 class Base(Main):
-    paths: list[str] = arg("PATH", "search to", nargs="+")
+    paths: "list[str]" = arg("PATH", "search to", nargs="+")
     carry_on: bool = flag("carry-on", "Continue on file errors", default=None)
     total = Counter()
 
     def ready(self):
-        if 1:
-            import logging
+        from logging import basicConfig
+        from os import environ
 
-            logging.basicConfig(
-                **dict(
-                    level=getattr(logging, "INFO"), format="%(levelname)s: %(message)s"
-                )
-            )
-        # self.__annotations__
+        format = environ.get("LOG_FORMAT", "%(levelname)s: %(message)s")
+        level = environ.get("LOG_LEVEL", "INFO")
+        basicConfig(format=format, level=level)
         return super().ready()
 
     def start(self):
@@ -123,12 +139,7 @@ class Base(Main):
 
 class Stat(Base):
     def go(self, db: dict):
-        link_duplicates(
-            db,
-            None,
-            self.total,
-            self.carry_on,
-        )
+        link_duplicates(db, None, self.total, self.carry_on)
 
     def init_argparse(self, argp: "ArgumentParser"):
         argp.description = r"Stats about linked files under given directory"
@@ -164,25 +175,27 @@ class Uniques(Stat):
         return super().init_argparse(argp)
 
 
-def sizerangep(s):
-    f, _, t = s.partition("..")
-    a, b = [filesizep(f) if f else 0, filesizep(t) if t else float("inf")]
-    return lambda n: n >= a and n <= b
-
-
 class Duplicates(Stat):
-    size_range = flag("sizes", "size range from..to", default=None, parser=sizerangep)
+    size_range = flag(
+        "sizes", "size range from..to", default=None, parser=size_range_check
+    )
     human_sizes: bool = flag("hrfs", "human readable file sizes", default=False)
 
     def go(self, db: dict):
         from . import list_duplicates
 
-        kw = {}
-
         if self.human_sizes:
-            kw["filesizef"] = filesizef
+            _size_f = filesizef
+        else:
+            _size_f = str
 
-        list_duplicates(db, self.total, size_filter=self.size_range, **kw)
+        def found(ino: int = 0, size: int = 0, dev: int = 0, paths: list[str] = []):
+            n = len(paths)
+            print(f"iNode:{ino} Links:{n} Size:{_size_f(size)}")
+            for p in paths:
+                print(f" - {p}")
+
+        list_duplicates(db, self.total, size_filter=self.size_range, found=found)
 
     def init_argparse(self, argp: "ArgumentParser"):
         argp.description = r"List duplicates files under given directory"

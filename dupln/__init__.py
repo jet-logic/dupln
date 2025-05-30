@@ -260,6 +260,16 @@ def get_linker(use_linker):
     return fun
 
 
+def iter_db(db: "dict[int, dict[int, dict[int, set[str]]]]"):
+    while db:
+        dev, size_map = db.popitem()
+        while size_map:
+            size, ino_map = size_map.popitem()
+            while ino_map:
+                ino, paths = ino_map.popitem()
+                yield (dev, size, ino, paths, size_map, ino_map)
+
+
 def list_uniques(db, tot):
     # type: (Dict[int, Dict[int, Dict[int, Set[str]]]], Any) -> None
     """
@@ -289,8 +299,8 @@ def list_uniques(db, tot):
                 print(path)
 
 
-def list_duplicates(db, tot, size_filter=None, filesizef=None):
-    # type: (Dict[int, Dict[int, Dict[int, Set[str]]]], Any, Union[Callable[[int], bool], None], Union[Callable[[int], str], None]) -> None
+def list_duplicates(db, tot, size_filter=None, filesizef=None, found=None):
+    # type: (Dict[int, Dict[int, Dict[int, Set[str]]]], Any, Union[Callable[[int], bool], None], Union[Callable[[int], str], None], Any) -> None
     """
     Print all duplicate files with optional filtering.
 
@@ -317,7 +327,11 @@ def list_duplicates(db, tot, size_filter=None, filesizef=None):
                     if size_filter is not None:
                         w = size_filter(size)
                     tot.same_ino += 1
-                    if w:
+                    if not w:
+                        pass
+                    elif found:
+                        found(ino=ino, paths=paths, size=size, dev=dev)
+                    else:
                         print(f"+ inode:{ino} links:{n} size:{filesizef(size)}")
                         for p in paths:
                             print(f" - {p}")

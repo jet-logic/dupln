@@ -4,20 +4,15 @@ Unit tests for dupln package core functionality.
 
 import pytest
 import os
-import stat
 import tempfile
 from hashlib import md5
-from pathlib import Path
 from typing import Dict, Set
 from dupln import (
     add_file,
     calc_md5,
     file_sort_key,
-    link_duplicates,
-    link_dups,
     get_linker,
     scan_dir,
-    list_uniques,
     list_duplicates,
 )
 

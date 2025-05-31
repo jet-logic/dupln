@@ -1,16 +1,12 @@
-from .main import Main, flag, arg
-from . import (
-    add_file,
-    get_linker,
-    link_duplicates,
-    list_uniques,
-    scan_dir,
-)
-from typing import TYPE_CHECKING, Any, Union
+from typing import TYPE_CHECKING
+from logging import info
+from .findskel import FindSkel
+from .main import Main, flag
+from . import add_file, get_linker, link_duplicates, list_uniques
 
 if TYPE_CHECKING:
     from argparse import ArgumentParser
-    from typing import Sequence
+    from typing import Sequence, Union
 
 
 def filesizef(s):
@@ -22,33 +18,6 @@ def filesizef(s):
             break
         s /= 1024.0
     return ("%.1f" % s).rstrip("0").rstrip(".") + x
-
-
-def filesizep(s: str):
-    if s[0].isnumeric():
-        q = s.lower().rstrip("b")
-        for i, v in enumerate("kmgtpezy"):
-            if q[-1].endswith(v):
-                return float(q[0:-1]) * (2 ** (10 * (i + 1)))
-        return float(q)
-    return float(s)
-
-
-def sizerangep(s=""):
-    f, d, t = s.partition("..")
-    if d:
-        a, b = [filesizep(f) if f else 0, filesizep(t) if t else float("inf")]
-        return (a, b)
-    elif f:
-        c = filesizep(f)
-        return (c, c)
-    else:
-        return (0, float("inf"))
-
-
-def size_range_check(s=""):
-    a, b = sizerangep(s)
-    return lambda n: n >= a and n <= b
 
 
 class Counter(object):
@@ -76,16 +45,52 @@ class Counter(object):
         return str(key) + " " + self._format_value(value, key) + ";"
 
     def _format_value(self, value, key):
-        # type: (Any, str) -> str
+        # type: (object, str) -> str
         if key in ("size", "disk_size"):
             return filesizef(value)
         return str(value)
 
 
-class Base(Main):
-    paths: "list[str]" = arg("PATH", "search to", nargs="+")
+class Main2(Main):
+    def parse_arguments(
+        self, argp: "ArgumentParser", args: "Sequence[str]|None"
+    ) -> None:
+        """Parse command line arguments."""
+        p = self._walk_subparsers(argp)
+
+        if p:
+            self._arg_parent = None
+            n = argp.parse_args(args)
+            try:
+                s = self._arg_final = n._arg_final
+            except AttributeError:
+                raise
+            else:
+                for k, v in n.__dict__.items():
+                    setattr(s, k, v)
+                s.ready()
+                s.start()
+                s.done()
+        else:
+            argp.parse_args(args, self)
+            self.ready()
+            self.start()
+            self.done()
+
+
+class Stat(Main2, FindSkel):
     carry_on: bool = flag("carry-on", "Continue on file errors", default=None)
-    total = Counter()
+
+    def __init__(self) -> None:
+        super().__init__()
+        self._glob_includes = []
+        self._glob_excludes = []
+        self._dir_depth = ()
+        self._file_sizes = []
+        self._paths_from = []
+        self._paths = []
+        self.total = Counter()
+        self.db = dict()
 
     def ready(self):
         from logging import basicConfig
@@ -94,56 +99,34 @@ class Base(Main):
         format = environ.get("LOG_FORMAT", "%(levelname)s: %(message)s")
         level = environ.get("LOG_LEVEL", "INFO")
         basicConfig(format=format, level=level)
+
+        #####
+        def accept(e, **kwargs):
+            # print(e.path)
+            return e.is_file()
+
+        self.on_check_accept(accept)
+        #####
         return super().ready()
 
-    def start(self):
-        # print(self.__class__.__name__, self.__dict__)
-        from logging import error, info
-        from os import stat
-        from stat import S_ISDIR
-
-        db = dict()
-        tot = self.total = Counter()
-        carry_on = self.carry_on
-
-        def statx(f):
-            try:
-                st = stat(f)
-            except Exception:
-                tot.file_err += 1
-                if carry_on is False:
-                    raise
-                from sys import exc_info
-
-                error(exc_info()[1])
-                return 0, 0, 0, 0, 0
-
-            return st.st_mode, st.st_size, st.st_ino, st.st_dev, st.st_mtime
-
-        for x in self.paths:
-            mode, size, ino, dev, mtime = statx(x)
-            # print(x, S_ISDIR(mode))
-            if S_ISDIR(mode):
-                scan_dir(x, db, statx)
-            else:
-                add_file(db, x, size, ino, dev, mtime)
-
-        try:
-            self.go(db)
-
-        finally:
-            # print(len(db))
-            self.total and info("Total {}".format(self.total))
-        return self.total
-
-
-class Stat(Base):
-    def go(self, db: dict):
-        link_duplicates(db, None, self.total, self.carry_on)
+    def run(self, db: dict, total: object):
+        link_duplicates(db, None, total, self.carry_on)
 
     def init_argparse(self, argp: "ArgumentParser"):
         argp.description = r"Stats about linked files under given directory"
         return super().init_argparse(argp)
+
+    def start(self):
+        self._walk_paths()
+        try:
+            self.run(self.db, self.total)
+        finally:
+            self.total and info("Total {}".format(self.total))
+
+    def process_entry(self, de):
+        st = de.stat()
+        # print(de.path)
+        add_file(self.db, de.path, st.st_size, st.st_ino, st.st_dev, st.st_mtime)
 
 
 class Link(Stat):
@@ -153,13 +136,8 @@ class Link(Stat):
         default="os.link",
     )
 
-    def go(self, db: dict):
-        link_duplicates(
-            db,
-            get_linker(self.linker),
-            self.total,
-            self.carry_on,
-        )
+    def run(self, db: dict, total: object):
+        link_duplicates(db, get_linker(self.linker), total, self.carry_on)
 
     def init_argparse(self, argp: "ArgumentParser"):
         argp.description = r"Link files under given directory"
@@ -167,21 +145,24 @@ class Link(Stat):
 
 
 class Uniques(Stat):
-    def go(self, db: dict):
-        list_uniques(db, self.total)
 
     def init_argparse(self, argp: "ArgumentParser"):
         argp.description = r"List unique files under given directory"
         return super().init_argparse(argp)
 
+    def run(self, db: dict, total: object):
+        print("Uniques:run")
+        list_uniques(db, total, print)
+
 
 class Duplicates(Stat):
-    size_range = flag(
-        "sizes", "size range from..to", default=None, parser=size_range_check
-    )
-    human_sizes: bool = flag("hrfs", "human readable file sizes", default=False)
+    human_sizes: bool = flag("human", "human readable file sizes", default=False)
 
-    def go(self, db: dict):
+    def init_argparse(self, argp: "ArgumentParser"):
+        argp.description = r"List duplicates files under given directory"
+        return super().init_argparse(argp)
+
+    def run(self, db: dict, total: object):
         from . import list_duplicates
 
         if self.human_sizes:
@@ -195,14 +176,10 @@ class Duplicates(Stat):
             for p in paths:
                 print(f" - {p}")
 
-        list_duplicates(db, self.total, size_filter=self.size_range, found=found)
-
-    def init_argparse(self, argp: "ArgumentParser"):
-        argp.description = r"List duplicates files under given directory"
-        return super().init_argparse(argp)
+        list_duplicates(db, total, found=found)
 
 
-class App(Main):
+class App(Main2):
 
     def add_arguments(self, argp: "ArgumentParser"):
         argp.prog = f"python -m {__package__}"

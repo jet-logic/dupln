@@ -256,4 +256,3 @@ class Main:
 
     _arg_final: "Main | None"
     _arg_parent: "Main | None"
-    _arg_parent_head: "tuple[Main, tuple] | None"

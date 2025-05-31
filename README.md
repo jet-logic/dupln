@@ -1,6 +1,8 @@
 ![DupLn Logo](dupln.png)
-[![made-with-python](https://img.shields.io/badge/Made%20with-Python-1f425f.svg)](https://www.python.org/)
+
+[![Python Version](https://img.shields.io/badge/python-3.8%2B-blue)](https://www.python.org/)
 [![PyPI version fury.io](https://badge.fury.io/py/dupln.svg)](https://pypi.python.org/pypi/dupln/)
+[![Tests Status](https://github.com/jet-logic/dupln/actions/workflows/test.yml/badge.svg)](https://github.com/jet-logic/dupln/actions)
 
 **Dupln**. This command-line application scans a specified directory for duplicate files and replaces duplicates with hard links to a single
 copy of the file. By doing so, it conserves storage space while preserving the file structure and accessibility.

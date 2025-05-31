@@ -8,6 +8,8 @@ This module provides core functionality for:
 - Listing unique/duplicate files with various filters
 """
 
+__version__ = "0.1.1"
+
 from hashlib import md5
 from os.path import join, dirname, exists, samefile
 from os import walk, unlink, chmod, rename, link, symlink, stat
@@ -270,8 +272,8 @@ def iter_db(db: "dict[int, dict[int, dict[int, set[str]]]]"):
                 yield (dev, size, ino, paths, size_map, ino_map)
 
 
-def list_uniques(db, tot):
-    # type: (Dict[int, Dict[int, Dict[int, Set[str]]]], Any) -> None
+def list_uniques(db, tot, found):
+    # type: (Dict[int, Dict[int, Dict[int, Set[str]]]], object, Union[Callable[[int], str], None]) -> None
     """
     Print all unique files (no duplicates found).
 
@@ -296,11 +298,11 @@ def list_uniques(db, tot):
                 tot.size += n * size
                 tot.disk_size += size
                 path = paths.pop()
-                print(path)
+                found(path)
 
 
 def list_duplicates(db, tot, size_filter=None, filesizef=None, found=None):
-    # type: (Dict[int, Dict[int, Dict[int, Set[str]]]], Any, Union[Callable[[int], bool], None], Union[Callable[[int], str], None], Any) -> None
+    # type: (Dict[int, Dict[int, Dict[int, Set[str]]]], object, Union[Callable[[int], bool], None], Union[Callable[[int], str], None], Any) -> None
     """
     Print all duplicate files with optional filtering.
 

@@ -74,7 +74,8 @@ class Test(unittest.TestCase):
         a = App()
         a.main(["uniques", tmp])
         total = a._arg_final.total
-        self.assertEqual(total.disk_size, v["size"])
+        self.assertRegex(a._arg_final.__class__.__name__.lower(), "unique")
+        self.assertEqual(total.disk_size, v["size"], v)
         self.assertEqual(total.files, v["files"])
         self.assertEqual(total.inodes, v["files"])
         self.assertEqual(total.size, v["size"])

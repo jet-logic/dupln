@@ -205,6 +205,7 @@ class Main:
                 raise
             else:
                 m, h, a = n.__dict__, None, s
+                print(m)
                 while a:
                     h = (a, h)
                     for k, v, t in _arg_fields(a):
@@ -255,4 +256,3 @@ class Main:
 
     _arg_final: "Main | None"
     _arg_parent: "Main | None"
-    _arg_parent_head: "tuple[Main, tuple] | None"

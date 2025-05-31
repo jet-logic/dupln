@@ -1,10 +1,5 @@
 name: Test Across
 
-# on:
-#   push:
-#     branches: [main, devel]
-#   pull_request:
-
 on:
   workflow_dispatch:
 

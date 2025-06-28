@@ -17,7 +17,7 @@ from dupln import (
 )
 
 
-class TestCounter:
+class CounterMock:
     """Mock counter class for testing"""
 
     def __init__(self):
@@ -232,7 +232,7 @@ def test_get_linker():
 def test_list_duplicates_with_size_filter(temp_dir, capsys):
     """Test listing duplicates with size filter"""
     db = {}
-    tot = TestCounter()
+    tot = CounterMock()
 
     def statx(f):
         st = os.stat(f)

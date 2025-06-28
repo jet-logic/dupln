@@ -8,7 +8,7 @@ This module provides core functionality for:
 - Listing unique/duplicate files with various filters
 """
 
-__version__ = "0.1.1"
+__version__ = "0.1.2"
 
 from hashlib import md5
 from os.path import join, dirname, exists, samefile

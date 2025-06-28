@@ -51,34 +51,7 @@ class Counter(object):
         return str(value)
 
 
-class Main2(Main):
-    def parse_arguments(
-        self, argp: "ArgumentParser", args: "Sequence[str]|None"
-    ) -> None:
-        """Parse command line arguments."""
-        p = self._walk_subparsers(argp)
-
-        if p:
-            self._arg_parent = None
-            n = argp.parse_args(args)
-            try:
-                s = self._arg_final = n._arg_final
-            except AttributeError:
-                raise
-            else:
-                for k, v in n.__dict__.items():
-                    setattr(s, k, v)
-                s.ready()
-                s.start()
-                s.done()
-        else:
-            argp.parse_args(args, self)
-            self.ready()
-            self.start()
-            self.done()
-
-
-class Stat(Main2, FindSkel):
+class Stat(FindSkel):
     carry_on: bool = flag("carry-on", "Continue on file errors", default=False)
 
     def __init__(self) -> None:
@@ -151,7 +124,7 @@ class Uniques(Stat):
         return super().init_argparse(argp)
 
     def run(self, db: dict, total: object):
-        print("Uniques:run")
+        # print("Uniques:run")
         list_uniques(db, total, print)
 
 
@@ -179,7 +152,7 @@ class Duplicates(Stat):
         list_duplicates(db, total, found=found)
 
 
-class App(Main2):
+class App(Main):
 
     def add_arguments(self, argp: "ArgumentParser"):
         argp.prog = f"python -m {__package__}"
@@ -193,4 +166,8 @@ class App(Main2):
         yield Duplicates(), {"name": "duplicates"}
 
 
-(__name__ == "__main__") and App().main()
+def main():
+    App().main()
+
+
+(__name__ == "__main__") and main()

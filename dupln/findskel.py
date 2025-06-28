@@ -2,7 +2,7 @@ from os import DirEntry
 from .main import Main
 from .walkdir import WalkDir
 
-__version__ = "0.0.3"
+__version__ = "0.0.4"
 
 
 class FindSkel(WalkDir, Main):
@@ -14,7 +14,6 @@ class FindSkel(WalkDir, Main):
     _paths: "list[str] | None" = None
 
     def add_arguments(self, argp):
-
         group = argp.add_argument_group("Traversal")
         # --depth-first
         group.add_argument(
@@ -38,11 +37,9 @@ class FindSkel(WalkDir, Main):
         except AttributeError:
             pass
         else:
-            if b:
-                argp.add_argument(
-                    "--act", action="store_false", dest="dry_run", help="not a test run"
-                )
-            else:
+            if b is True:
+                argp.add_argument("--act", action="store_false", dest="dry_run", help="not a test run")
+            elif b is False:
                 argp.add_argument(
                     "--dry-run",
                     action="store_true",
@@ -54,7 +51,6 @@ class FindSkel(WalkDir, Main):
         _glob_excludes: list[str] = getattr(self, "_glob_excludes", None)
 
         if _glob_excludes is not None or _glob_includes is not None:
-
             group.add_argument(
                 "--exclude",
                 metavar="GLOB",
@@ -207,7 +203,6 @@ def as_source(path="-", mode="rb"):
 
 
 def globre3(g: str, base="", escape=lambda x: "", no_neg=False):
-
     if no_neg is False and g.startswith("!"):
         neg = True
         g = g[1:]
@@ -237,9 +232,9 @@ def globre3(g: str, base="", escape=lambda x: "", no_neg=False):
                 res = res + ".*"
                 if i < n and "/" == g[i]:
                     i = i + 1
-                    res += "/?"
+                    res = res + "/?"
             else:
-                res = res + "[^/]+"
+                res = res + "[^/]*"
         elif c == "?":
             res = res + "[^/]"
         elif c == "[":
@@ -261,7 +256,9 @@ def globre3(g: str, base="", escape=lambda x: "", no_neg=False):
                     stuff = "\\" + stuff
                 res = "%s[%s]" % (res, stuff)
         else:
-            res = res + escape(c)
+            x = escape(c)
+            assert x
+            res = res + x
     if at_start:
         if base:
             res = "^" + escape(base) + "/" + res + r"\Z"

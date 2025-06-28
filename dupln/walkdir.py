@@ -19,14 +19,10 @@ class FileSystemEntry:
         return stat(self.path, follow_symlinks=follow_symlinks)
 
     def is_symlink(self, follow_symlinks: bool = True) -> bool:
-        return (
-            self.stat(follow_symlinks=follow_symlinks).st_mode & 0o170000
-        ) == 0o120000
+        return (self.stat(follow_symlinks=follow_symlinks).st_mode & 0o170000) == 0o120000
 
     def is_dir(self, follow_symlinks: bool = True) -> bool:
-        return (
-            self.stat(follow_symlinks=follow_symlinks).st_mode & 0o170000
-        ) == 0o040000
+        return (self.stat(follow_symlinks=follow_symlinks).st_mode & 0o170000) == 0o040000
 
     def is_file(self, follow_symlinks: bool = True) -> bool:
         return (self.stat(follow_symlinks=follow_symlinks).st_mode & 0o170000) in (
@@ -75,15 +71,10 @@ class WalkDir:
 
     def scan_directory(self, src: str) -> Generator[DirEntry, None, None]:
         try:
-            # enter_dir
             it = scandir(src)
-        except FileNotFoundError:
-            pass
-        except Exception:
-            if self.carry_on:
-                pass
-            else:
-                raise
+        except Exception as ex:
+            if self.file_error(src, ex) is None:
+                raise ex
         else:
             yield from it
 
@@ -93,9 +84,12 @@ class WalkDir:
     def process_entry(self, de: "DirEntry | FileSystemEntry") -> None:
         print(de.path)
 
-    def _walk_breadth_first(
-        self, src: str, depth: int = 0
-    ) -> Generator[DirEntry, None, None]:
+    def file_error(self, path: str, ex: Exception) -> None:
+        if self.carry_on:
+            print(ex)
+            return True
+
+    def _walk_breadth_first(self, src: str, depth: int = 0) -> Generator[DirEntry, None, None]:
         depth += 1
         for de in self.scan_directory(src):
             if self.check_accept(de, depth):
@@ -103,9 +97,7 @@ class WalkDir:
             if self.check_enter(de, depth):
                 self._walk_breadth_first(de.path, depth)
 
-    def _walk_depth_first(
-        self, src: str, depth: int = 0
-    ) -> Generator[DirEntry, None, None]:
+    def _walk_depth_first(self, src: str, depth: int = 0) -> Generator[DirEntry, None, None]:
         depth += 1
         for de in self.scan_directory(src):
             if self.check_enter(de, depth):
@@ -118,13 +110,10 @@ class WalkDir:
         is_dir = None
         try:
             is_dir = de.is_dir()
-        except FileNotFoundError:
+        except Exception as ex:
+            if self.file_error(p, ex) is None:
+                raise ex
             return
-        except Exception:
-            if self.carry_on:
-                pass
-            else:
-                raise
         if is_dir:
             self._root_dir = de.path
             if self.depth_first:
